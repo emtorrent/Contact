@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Contact</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;min-height:100dvh;display:flex;align-items:center;justify-content:center;background:#14162b;color:#fff;font:18px system-ui,sans-serif;text-align:center}
+main{width:100%;max-width:420px;padding:20px}
+h1{margin:0 0 8px;font-size:30px}
+p{color:#bbc;margin:8px 0 20px}
+input{width:100%;padding:14px;font-size:22px;text-align:center;border-radius:12px;border:0;margin-bottom:12px}
+button{width:100%;padding:16px;font-size:20px;font-weight:700;border:0;border-radius:12px;margin-top:10px;background:#ffd34d;color:#222}
+button.alt{background:#2c3060;color:#fff}
+#word{font-size:44px;letter-spacing:8px;margin:24px 0;font-weight:800;word-break:break-all}
+#count{font-size:90px;font-weight:800;margin:30px 0}
+</style>
+</head>
+<body>
+<main id="m"></main>
+<script>
+const m = document.getElementById('m');
+const norm = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-zñ]/g, '');
+let secret = '', shown = 1, msg = '', voice = false, inBoard = false, rec;
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+if (SR) {
+  rec = new SR(); rec.lang = 'en-US'; rec.continuous = true; rec.interimResults = true;
+  rec.onresult = e => {
+    for (let i = e.resultIndex; i < e.results.length; i++)
+      if (inBoard && /contac|kontak/i.test(e.results[i][0].transcript)) { inBoard = false; rec.stop(); countdown(); return; }
+  };
+  rec.onend = () => { if (voice && inBoard) try { rec.start(); } catch (e) {} };
+  rec.onerror = e => { if (e.error === 'no-speech' || e.error === 'aborted') return; voice = false; msg = 'Error de voz: ' + e.error + (location.protocol === 'file:' ? ' (abre la página por http://localhost, no como archivo)' : ''); if (inBoard) board(); };
+}
+function toggleVoice() {
+  voice = !voice;
+  if (voice) try { rec.start(); } catch (e) {} else rec.stop();
+  board();
+}
+
+function view(html) { m.innerHTML = html; const i = m.querySelector('input'); if (i) i.focus(); }
+
+function setup() {
+  view(`<h1>Contact</h1><p>El guardián escribe la palabra secreta. Que nadie más mire.</p>
+  <input id="w" type="password" placeholder="Palabra secreta" autocomplete="off">
+  <button onclick="start()">Empezar</button>`);
+}
+function start() {
+  secret = norm(document.getElementById('w').value);
+  if (secret.length < 3) return alert('Mínimo 3 letras');
+  shown = 1; msg = ''; board();
+}
+function board() {
+  inBoard = true;
+  if (voice) try { rec.start(); } catch (e) {}
+  const w = secret.split('').map((c, i) => i < shown ? c : '_').join('').toUpperCase();
+  view(`<h1>Contact</h1><div id="word">${w}</div><p>${msg}</p>
+  <button onclick="countdown()">¡Contact!</button>
+  ${SR ? `<button class="alt" onclick="toggleVoice()">🎤 Voz “contact”: ${voice ? 'activada' : 'desactivada'}</button>` : ''}
+  <button class="alt" onclick="guess()">Adivinar la palabra</button>
+  <button class="alt" onclick="setup()">Nueva partida</button>`);
+  msg = '';
+}
+function countdown() {
+  inBoard = false; if (rec) rec.stop();
+  let n = 3;
+  const tick = () => { view(`<p>Decid la palabra a la vez en…</p><div id="count">${n || '¡YA!'}</div>`); if (n-- > 0) setTimeout(tick, 350); else setTimeout(result, 600); };
+  tick();
+}
+function result() {
+  view(`<h1>¿Coincidieron?</h1><p>Si el guardián adivinó la palabra, cuenta como que no.</p>
+  <button onclick="ok()">Sí, coinciden</button><button class="alt" onclick="board()">No coinciden</button>`);
+}
+function ok() {
+  shown++;
+  if (shown >= secret.length) return win('Se descubrió la palabra: ' + secret.toUpperCase());
+  msg = 'Contact. Nueva letra'; board();
+}
+function guess() {
+  inBoard = false;
+  view(`<h1>Adivinar</h1><input id="g" placeholder="¿Cuál es la palabra?" autocomplete="off">
+  <button onclick="check()">Probar</button><button class="alt" onclick="board()">Volver</button>`);
+}
+function check() {
+  if (norm(document.getElementById('g').value) === secret) win('¡Acertaste! ' + secret.toUpperCase());
+  else { msg = 'Esa no es'; board(); }
+}
+function win(t) { view(`<h1>🎉</h1><p style="color:#fff;font-size:24px">${t}</p><button onclick="setup()">Otra partida</button>`); }
+setup();
+</script>
+</body>
+</html>
